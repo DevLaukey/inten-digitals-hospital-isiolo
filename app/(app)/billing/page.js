@@ -1,11 +1,11 @@
 "use client";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Minus, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { useSession } from "@/components/AppShell";
 import { Button, Card, Empty, ErrorNote, Field, inputClass, Loading, PageHeader } from "@/components/ui";
-import { DEPARTMENTS, PAYMENT_METHODS } from "@/lib/constants";
+import { canWaive, DEPARTMENTS, PAYMENT_METHODS } from "@/lib/constants";
 import { formatMoney, matches, patientName } from "@/lib/format";
 import { createBill, listCatalogue, listPatients } from "@/lib/store";
 import { useLoad } from "@/lib/useLoad";
@@ -95,26 +95,22 @@ function BillingScreen() {
     patients: await listPatients(),
   }));
 
-  const [patient, setPatient] = useState(null);
+  const [pickedPatient, setPatient] = useState(undefined); // undefined until someone chooses
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("All");
   const [cart, setCart] = useState({}); // itemId -> qty
   const [waiver, setWaiver] = useState("");
-  const [method, setMethod] = useState("cash");
+  const [chosenMethod, setMethod] = useState("cash");
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (data && preselectedId) {
-      setPatient(data.patients.find((p) => p.id === preselectedId) || null);
-    }
-  }, [data, preselectedId]);
-
+  const patient =
+    pickedPatient !== undefined
+      ? pickedPatient
+      : data?.patients.find((p) => p.id === preselectedId) || null;
   const hasInsurance = Boolean(patient?.insurer);
-  useEffect(() => {
-    if (method === "insurance" && !hasInsurance) setMethod("cash");
-  }, [method, hasInsurance]);
+  const method = chosenMethod === "insurance" && !hasInsurance ? "cash" : chosenMethod;
 
   const lines = useMemo(() => {
     if (!data) return [];
@@ -158,7 +154,6 @@ function BillingScreen() {
         lines: lines.map(({ item, qty }) => ({ itemId: item.id, qty })),
         waiver: waiverAmount,
         payment,
-        actor: session,
       });
       router.push(`/bills/${bill.id}`);
     } catch (err) {
@@ -288,17 +283,19 @@ function BillingScreen() {
               <span className="text-slate-600">Subtotal</span>
               <span className="tabular-nums">{formatMoney(subtotal)}</span>
             </div>
-            <Field label="Waiver (KSh)">
-              <input
-                type="number"
-                min="0"
-                step="1"
-                inputMode="numeric"
-                value={waiver}
-                onChange={(e) => setWaiver(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
+            {canWaive(session.role) && (
+              <Field label="Waiver (KSh)">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={waiver}
+                  onChange={(e) => setWaiver(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            )}
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
               <span className="tabular-nums">{formatMoney(total)}</span>

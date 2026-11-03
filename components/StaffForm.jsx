@@ -5,6 +5,21 @@ import { Button, Card, ErrorNote, Field, inputClass } from "@/components/ui";
 import { ROLES } from "@/lib/constants";
 import { saveStaff } from "@/lib/store";
 
+// A temporary password is shown only once: it isn't stored anywhere we can read it back.
+export function TempPassword({ email, password, children }) {
+  return (
+    <Card className="max-w-2xl space-y-3 p-4 sm:p-6">
+      <h2 className="font-semibold">Temporary password for {email}</h2>
+      <p className="break-all rounded-lg bg-slate-100 p-3 font-mono text-lg">{password}</p>
+      <p className="text-sm text-slate-600">
+        Give this to them privately. It won&apos;t be shown again, and they will be asked to choose their own
+        password when they first sign in.
+      </p>
+      {children}
+    </Card>
+  );
+}
+
 export default function StaffForm({ member }) {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -16,6 +31,7 @@ export default function StaffForm({ member }) {
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState(null);
 
   const bind = (name) => ({
     value: form[name],
@@ -28,13 +44,22 @@ export default function StaffForm({ member }) {
     setBusy(true);
     setError("");
     try {
-      await saveStaff(member?.id, form);
-      router.push("/staff");
+      const result = await saveStaff(member?.id, form);
+      if (result.tempPassword) setCreated(result);
+      else router.push("/staff");
     } catch (err) {
       setError(err.message);
       setBusy(false);
     }
   };
+
+  if (created) {
+    return (
+      <TempPassword email={created.member.email} password={created.tempPassword}>
+        <Button onClick={() => router.push("/staff")}>Done</Button>
+      </TempPassword>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="max-w-2xl space-y-4">

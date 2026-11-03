@@ -11,6 +11,7 @@ export default function ItemForm({ item }) {
     name: item?.name ?? "",
     department: item?.department ?? "",
     price: item?.price ?? "",
+    buyingPrice: item?.buyingPrice ?? "",
     tracksStock: item?.tracksStock ?? false,
     stock: item?.stock ?? "",
     reorderLevel: item?.reorderLevel ?? "",
@@ -30,10 +31,13 @@ export default function ItemForm({ item }) {
     setBusy(true);
     setError("");
     try {
+      const stock = form.tracksStock ? Number(form.stock) : 0;
       await saveItem(item?.id, {
         ...form,
         price: Number(form.price),
-        stock: form.tracksStock ? Number(form.stock) : 0,
+        buyingPrice: form.buyingPrice === "" ? null : Number(form.buyingPrice),
+        // Left out when unchanged, so saving a price edit can't undo sales made meanwhile.
+        stock: item && stock === item.stock ? undefined : stock,
         reorderLevel: form.tracksStock ? Number(form.reorderLevel) : 0,
         unit: form.tracksStock ? form.unit : "",
       });
@@ -43,6 +47,8 @@ export default function ItemForm({ item }) {
       setBusy(false);
     }
   };
+
+  const sellsAtLoss = form.buyingPrice !== "" && form.price !== "" && Number(form.price) < Number(form.buyingPrice);
 
   return (
     <form onSubmit={submit} className="max-w-2xl space-y-4">
@@ -57,7 +63,14 @@ export default function ItemForm({ item }) {
               {DEPARTMENTS.map((department) => <option key={department}>{department}</option>)}
             </select>
           </Field>
-          <Field label="Price (KSh)" required>
+          <Field label="Buying price (KSh)" hint="What the hospital pays. Leave blank if there's no purchase cost, as with a consultation.">
+            <input type="number" min="0" step="1" {...bind("buyingPrice")} />
+          </Field>
+          <Field
+            label="Selling price (KSh)"
+            required
+            hint={sellsAtLoss ? "This is below the buying price." : "What the patient is charged."}
+          >
             <input type="number" min="0" step="1" required {...bind("price")} />
           </Field>
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-2">

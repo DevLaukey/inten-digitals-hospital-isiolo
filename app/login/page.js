@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/AppShell";
 import { Button, Card, ErrorNote, Field, inputClass } from "@/components/ui";
-import { DEMO_PASSWORD, getSession, login } from "@/lib/auth";
+import { getSession, login } from "@/lib/auth";
 import { homeFor } from "@/lib/constants";
 
 export default function LoginPage() {
@@ -14,9 +14,13 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getSession().then((member) => {
-      if (member) router.replace(homeFor(member.role));
-    });
+    getSession()
+      .then((member) => {
+        if (member) router.replace(homeFor(member.role));
+      })
+      .catch(() => {
+        // Offline: the form still shows, and signing in will explain the problem.
+      });
   }, [router]);
 
   const submit = async (event) => {
@@ -67,12 +71,9 @@ export default function LoginPage() {
             </Button>
           </form>
         </Card>
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          <p className="font-semibold">Demo accounts (password: {DEMO_PASSWORD})</p>
-          <p className="mt-1">
-            admin@, cashier@, reception@, pharmacy@, lab@, nurse@ or doctor@ followed by hospital.test
-          </p>
-        </div>
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Forgotten your password? Ask your administrator to reset it.
+        </p>
       </div>
     </main>
   );

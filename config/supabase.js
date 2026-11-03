@@ -1,6 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-export const supabase = createClient(supabaseUrl, supabaseKey);
+let client;
+
+// Created on first use, so building the app doesn't need the settings.
+// The key is public by design: row level security in docs/schema.sql protects the data.
+export function supabase() {
+  client ??= createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+  return client;
+}

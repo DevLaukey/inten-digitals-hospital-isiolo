@@ -15,6 +15,7 @@ export default function CataloguePage() {
   const [department, setDepartment] = useState("All");
   const [lowOnly, setLowOnly] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
+  const [actionError, setActionError] = useState("");
 
   if (loading) return <Loading />;
   if (error) return <ErrorNote>{error}</ErrorNote>;
@@ -27,9 +28,14 @@ export default function CataloguePage() {
   );
 
   const remove = async (id) => {
-    await deleteItem(id);
+    setActionError("");
+    try {
+      await deleteItem(id);
+      reload();
+    } catch (err) {
+      setActionError(err.message);
+    }
     setConfirmingId(null);
-    reload();
   };
 
   return (
@@ -37,6 +43,7 @@ export default function CataloguePage() {
       <PageHeader title="Services & drugs" subtitle="Everything that can be added to a bill">
         <LinkButton href="/catalogue/new"><Plus size={16} aria-hidden /> Add item</LinkButton>
       </PageHeader>
+      <div className="mb-4 empty:hidden"><ErrorNote>{actionError}</ErrorNote></div>
       <Card>
         <div className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
           <input
@@ -72,7 +79,8 @@ export default function CataloguePage() {
             <thead>
               <tr>
                 <th>Item</th>
-                <th className="text-right">Price</th>
+                <th className="text-right">Buying price</th>
+                <th className="text-right">Selling price</th>
                 <th className="text-right">Stock</th>
                 <th><span className="sr-only">Actions</span></th>
               </tr>
@@ -83,6 +91,9 @@ export default function CataloguePage() {
                   <td>
                     <p className="font-medium">{item.name}</p>
                     <p className="text-xs text-slate-500">{item.department}</p>
+                  </td>
+                  <td className="whitespace-nowrap text-right tabular-nums">
+                    {item.buyingPrice === null ? <span className="text-slate-400">-</span> : formatMoney(item.buyingPrice)}
                   </td>
                   <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(item.price)}</td>
                   <td className="whitespace-nowrap text-right tabular-nums">

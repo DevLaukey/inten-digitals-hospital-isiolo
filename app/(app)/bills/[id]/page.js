@@ -11,7 +11,7 @@ import { formatDateTime, formatMoney } from "@/lib/format";
 import { getBill, recordPayment, voidBill } from "@/lib/store";
 import { useLoad } from "@/lib/useLoad";
 
-function PaymentForm({ bill, actor, onDone }) {
+function PaymentForm({ bill, onDone }) {
   const isClaim = bill.status === "claim";
   const [method, setMethod] = useState(isClaim ? "insurance" : "cash");
   const [reference, setReference] = useState("");
@@ -25,7 +25,7 @@ function PaymentForm({ bill, actor, onDone }) {
     event.preventDefault();
     setError("");
     try {
-      await recordPayment(bill.id, { method, reference }, actor);
+      await recordPayment(bill.id, { method, reference });
       onDone();
     } catch (err) {
       setError(err.message);
@@ -67,7 +67,7 @@ function PaymentForm({ bill, actor, onDone }) {
   );
 }
 
-function VoidForm({ bill, actor, onDone }) {
+function VoidForm({ bill, onDone }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
 
@@ -75,7 +75,7 @@ function VoidForm({ bill, actor, onDone }) {
     event.preventDefault();
     setError("");
     try {
-      await voidBill(bill.id, reason, actor);
+      await voidBill(bill.id, reason);
       onDone();
     } catch (err) {
       setError(err.message);
@@ -208,9 +208,9 @@ export default function BillDetailPage() {
         </Card>
 
         <div className="space-y-4">
-          {canSettle && <PaymentForm bill={bill} actor={session} onDone={reload} />}
+          {canSettle && <PaymentForm bill={bill} onDone={reload} />}
           {session.role === "admin" && bill.status !== "void" && (
-            <VoidForm bill={bill} actor={session} onDone={reload} />
+            <VoidForm bill={bill} onDone={reload} />
           )}
         </div>
       </div>

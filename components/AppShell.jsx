@@ -1,16 +1,18 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   HeartPulse,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
   Pill,
   PlusCircle,
   Receipt,
+  ScrollText,
   UserCog,
   Users,
   X,
@@ -18,7 +20,7 @@ import {
 import { HOSPITAL } from "@/config/hospital";
 import { getSession, logout } from "@/lib/auth";
 import { canAccess, homeFor, ROLES } from "@/lib/constants";
-import { Loading } from "./ui";
+import { Button, ErrorNote, Loading } from "./ui";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,9 +30,12 @@ const NAV = [
   { href: "/catalogue", label: "Services & drugs", icon: Pill },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/staff", label: "Staff", icon: UserCog },
+  { href: "/audit", label: "Audit log", icon: ScrollText },
 ];
 
 const SUBSCRIPTION_CHECK_MS = 5 * 60 * 1000;
+// Reception and pharmacy PCs are shared, so an unattended session has to end by itself.
+const IDLE_SIGN_OUT_MS = 30 * 60 * 1000;
 
 const SessionContext = createContext(null);
 export const useSession = () => useContext(SessionContext);
@@ -58,16 +63,44 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [session, setSession] = useState(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const lastActivity = useRef(0);
+
+  const passwordDue = Boolean(session?.mustChangePassword) && pathname !== "/account";
 
   // Re-checked on each navigation so a deactivated account or changed role applies at once.
   useEffect(() => {
-    getSession().then((member) => {
-      setSession(member);
-      if (!member) router.replace("/login");
-      else if (!canAccess(member.role, pathname)) router.replace(homeFor(member.role));
-    });
-    setMenuOpen(false);
-  }, [pathname, router]);
+    getSession()
+      .then((member) => {
+        setOffline(false);
+        setSession(member);
+        setMenuOpen(false);
+        if (!member) router.replace("/login");
+        else if (member.mustChangePassword && pathname !== "/account") router.replace("/account");
+        else if (!canAccess(member.role, pathname)) router.replace(homeFor(member.role));
+      })
+      .catch(() => setOffline(true));
+  }, [pathname, router, attempt]);
+
+  useEffect(() => {
+    const touch = () => {
+      lastActivity.current = Date.now();
+    };
+    touch();
+    window.addEventListener("pointerdown", touch);
+    window.addEventListener("keydown", touch);
+    const timer = setInterval(async () => {
+      if (Date.now() - lastActivity.current < IDLE_SIGN_OUT_MS) return;
+      await logout();
+      window.location.replace("/login");
+    }, 60 * 1000);
+    return () => {
+      window.removeEventListener("pointerdown", touch);
+      window.removeEventListener("keydown", touch);
+      clearInterval(timer);
+    };
+  }, []);
 
   // The server checks on page load, but a tab left open needs to notice a pause too.
   useEffect(() => {
@@ -85,12 +118,21 @@ export default function AppShell({ children }) {
     return () => clearInterval(timer);
   }, [pathname]);
 
-  if (!session || !canAccess(session.role, pathname)) {
+  if (offline && !session) {
+    return (
+      <main className="mx-auto max-w-md space-y-3 p-6">
+        <ErrorNote>Can&apos;t reach the server. Check your connection and try again.</ErrorNote>
+        <Button onClick={() => setAttempt((count) => count + 1)}>Try again</Button>
+      </main>
+    );
+  }
+
+  if (!session || passwordDue || !canAccess(session.role, pathname)) {
     return <Loading />;
   }
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await logout();
     router.replace("/login");
   };
 
@@ -162,6 +204,9 @@ export default function AppShell({ children }) {
               {session.firstName} {session.lastName}
             </p>
             <p className="mb-3 text-xs text-slate-400">{ROLES[session.role]}</p>
+            <Link href="/account" className="mb-2 flex items-center gap-2 text-sm text-slate-300 hover:text-white">
+              <KeyRound size={16} aria-hidden /> Change password
+            </Link>
             <button
               type="button"
               onClick={signOut}
@@ -173,9 +218,6 @@ export default function AppShell({ children }) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 print:hidden">
-            Demo mode: sample data stored in this browser only. Do not enter real patient information.
-          </p>
           <main className="mx-auto max-w-7xl p-4 sm:p-6 print:max-w-none print:p-0">{children}</main>
         </div>
       </div>
