@@ -294,14 +294,14 @@ test("only administrators and pharmacists can see or set buying prices", async (
   await sys("insert into catalogue (id, name, department, price) values ('COST', 'Syrup', 'Pharmacy', 300)");
   await as("pharmacist", "insert into item_costs (id, buying_price) values ('COST', 180)");
   for (const role of ["admin", "pharmacist"]) {
-    assert.equal((await as(role, "select buying_price from item_costs where id = 'COST'")).rows[0].buying_price, 180, role);
+    assert.equal(Number((await as(role, "select buying_price from item_costs where id = 'COST'")).rows[0].buying_price), 180, role);
   }
   for (const role of ["cashier", "receptionist", "lab", "nurse", "doctor"]) {
     assert.equal((await as(role, "select * from item_costs")).rows.length, 0, role);
     await assert.rejects(as(role, "insert into item_costs (id, buying_price) values ('ITM-0001', 1)"), /row-level security/, role);
   }
   await as("cashier", "update item_costs set buying_price = 1");
-  assert.equal((await sys("select buying_price from item_costs where id = 'COST'")).rows[0].buying_price, 180);
+  assert.equal(Number((await sys("select buying_price from item_costs where id = 'COST'")).rows[0].buying_price), 180);
   await assert.rejects(as("admin", "insert into item_costs (id, buying_price) values ('ITM-0001', -1)"), /check/);
 });
 
@@ -317,10 +317,20 @@ test("bills charge the selling price and keep the buying price from the day of s
   const id = await bill("cashier", [{ item_id: "COST", qty: 2 }]);
   await as("pharmacist", "update item_costs set buying_price = 250 where id = 'COST'");
   const line = (await sys("select * from bill_lines where bill_id = $1", [id])).rows[0];
-  assert.deepEqual([line.unit_price, line.amount, line.unit_cost], [300, 600, 180]);
+  assert.deepEqual([line.unit_price, line.amount, Number(line.unit_cost)], [300, 600, 180]);
 
   const uncosted = await bill("cashier", [{ item_id: "ITM-0001", qty: 1 }]);
   assert.equal((await sys("select unit_cost from bill_lines where bill_id = $1", [uncosted])).rows[0].unit_cost, null);
+});
+
+test("buying prices keep their cents, on the item and on the bill", async () => {
+  await sys("insert into catalogue (id, name, department, price) values ('CENTS', 'Worm tablet', 'Pharmacy', 50)");
+  await as("admin", "insert into item_costs (id, buying_price) values ('CENTS', 3.70)");
+  const query = "select c.*, (select row_to_json(k) from (select buying_price from item_costs where id = c.id) k) as item_costs from catalogue c where c.id = 'CENTS'";
+  assert.equal(itemFromRow((await as("admin", query)).rows[0]).buyingPrice, 3.7);
+  const id = await bill("cashier", [{ item_id: "CENTS", qty: 2 }]);
+  const line = (await sys("select * from bill_lines where bill_id = $1", [id])).rows[0];
+  assert.deepEqual([Number(line.unit_cost), line.unit_price, line.amount], [3.7, 50, 100]);
 });
 
 test("no role can read the buying price through a bill", async () => {
@@ -382,5 +392,7 @@ test("database errors become messages staff can act on", () => {
   assert.match(friendlyMessage({ code: "23505", message: 'violates "bills_mpesa_reference_key"' }), /M-Pesa code/);
   assert.match(friendlyMessage({ code: "P0001", message: "Only 2 of Tablet left in stock." }), /Only 2/);
   assert.match(friendlyMessage({ code: "42501", message: "x" }), /permission/);
+  assert.match(friendlyMessage({ code: "PGRST200", message: "no relationship" }), /needs an update/);
+  assert.match(friendlyMessage({ code: "PGRST205", message: "no table" }), /needs an update/);
   assert.doesNotMatch(friendlyMessage({ code: "XX000", message: "secret internals" }), /internals/);
 });

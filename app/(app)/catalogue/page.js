@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { Button, Card, Empty, ErrorNote, inputClass, LinkButton, Loading, PageHeader, Table } from "@/components/ui";
 import { isLowStock } from "@/lib/billing";
 import { DEPARTMENTS } from "@/lib/constants";
-import { formatMoney, matches } from "@/lib/format";
+import { formatCost, formatMoney, matches } from "@/lib/format";
 import { deleteItem, listCatalogue } from "@/lib/store";
 import { useLoad } from "@/lib/useLoad";
 
@@ -93,7 +93,7 @@ export default function CataloguePage() {
                     <p className="text-xs text-slate-500">{item.department}</p>
                   </td>
                   <td className="whitespace-nowrap text-right tabular-nums">
-                    {item.buyingPrice === null ? <span className="text-slate-400">-</span> : formatMoney(item.buyingPrice)}
+                    {item.buyingPrice === null ? <span className="text-slate-400">-</span> : formatCost(item.buyingPrice)}
                   </td>
                   <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(item.price)}</td>
                   <td className="whitespace-nowrap text-right tabular-nums">

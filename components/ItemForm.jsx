@@ -64,7 +64,7 @@ export default function ItemForm({ item }) {
             </select>
           </Field>
           <Field label="Buying price (KSh)" hint="What the hospital pays. Leave blank if there's no purchase cost, as with a consultation.">
-            <input type="number" min="0" step="1" {...bind("buyingPrice")} />
+            <input type="number" min="0" step="0.01" {...bind("buyingPrice")} />
           </Field>
           <Field
             label="Selling price (KSh)"
