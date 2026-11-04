@@ -348,6 +348,18 @@ test("an item with no selling price can be stored but never billed", async () =>
   assert.ok(await bill("cashier", [{ item_id: "NOSP", qty: 1 }]));
 });
 
+test("items can use every category in the app's list, and no others", async () => {
+  const listed = readFileSync(new URL("../lib/constants.js", import.meta.url), "utf8")
+    .match(/DEPARTMENTS = \[([\s\S]*?)\]/)[1]
+    .match(/"[^"]+"/g)
+    .map((name) => name.slice(1, -1));
+  assert.ok(listed.includes("Medical Supplies"));
+  for (const [index, department] of listed.entries()) {
+    await as("pharmacist", "insert into catalogue (name, department, price) values ($1, $2, 1)", [`Category test ${index}`, department]);
+  }
+  await assert.rejects(as("pharmacist", "insert into catalogue (name, department, price) values ('x', 'Nonsense', 1)"), /check/);
+});
+
 test("no role can read the buying price through a bill", async () => {
   await assert.rejects(as("cashier", "select unit_cost from bill_lines"), /permission denied/);
   await assert.rejects(as("admin", "select * from bill_lines"), /permission denied/);
