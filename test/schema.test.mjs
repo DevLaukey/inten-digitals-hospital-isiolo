@@ -333,6 +333,21 @@ test("buying prices keep their cents, on the item and on the bill", async () => 
   assert.deepEqual([Number(line.unit_cost), line.unit_price, line.amount], [3.7, 50, 100]);
 });
 
+test("an item with no selling price can be stored but never billed", async () => {
+  await sys("insert into catalogue (id, name, department, tracks_stock, stock) values ('NOSP', 'Unpriced', 'Pharmacy', true, 5)");
+  assert.equal(itemFromRow((await as("cashier", "select * from catalogue where id = 'NOSP'")).rows[0]).price, null);
+  const before = (await sys("select value from counters where name = 'bill'")).rows[0].value;
+  await assert.rejects(bill("cashier", [{ item_id: "NOSP", qty: 1 }]), (err) => {
+    assert.match(friendlyMessage(err), /no selling price/);
+    return true;
+  });
+  await assert.rejects(bill("cashier", [{ item_id: "ITM-0001", qty: 1 }, { item_id: "NOSP", qty: 1 }], { method: "cash" }), /null value/);
+  assert.equal(await stockOf("NOSP"), 5);
+  assert.equal((await sys("select value from counters where name = 'bill'")).rows[0].value, before);
+  await as("pharmacist", "update catalogue set price = 40 where id = 'NOSP'");
+  assert.ok(await bill("cashier", [{ item_id: "NOSP", qty: 1 }]));
+});
+
 test("no role can read the buying price through a bill", async () => {
   await assert.rejects(as("cashier", "select unit_cost from bill_lines"), /permission denied/);
   await assert.rejects(as("admin", "select * from bill_lines"), /permission denied/);

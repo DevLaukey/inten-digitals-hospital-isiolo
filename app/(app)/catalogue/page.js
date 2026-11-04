@@ -95,7 +95,9 @@ export default function CataloguePage() {
                   <td className="whitespace-nowrap text-right tabular-nums">
                     {item.buyingPrice === null ? <span className="text-slate-400">-</span> : formatCost(item.buyingPrice)}
                   </td>
-                  <td className="whitespace-nowrap text-right tabular-nums">{formatMoney(item.price)}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums">
+                    {item.price === null ? <span className="font-semibold text-amber-800">Not set</span> : formatMoney(item.price)}
+                  </td>
                   <td className="whitespace-nowrap text-right tabular-nums">
                     {item.tracksStock ? (
                       <>

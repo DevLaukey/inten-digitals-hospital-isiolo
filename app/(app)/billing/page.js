@@ -207,7 +207,8 @@ function BillingScreen() {
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {visibleItems.map((item) => {
-                  const out = item.tracksStock && item.stock - (cart[item.id] || 0) <= 0;
+                  const noPrice = item.price === null;
+                  const out = noPrice || (item.tracksStock && item.stock - (cart[item.id] || 0) <= 0);
                   return (
                     <button
                       key={item.id}
@@ -222,8 +223,8 @@ function BillingScreen() {
                         {item.tracksStock && ` · ${item.stock} in stock`}
                       </p>
                       <p className="mt-1 text-sm font-semibold tabular-nums">
-                        {formatMoney(item.price)}
-                        {item.unit && <span className="font-normal text-slate-500"> / {item.unit}</span>}
+                        {noPrice ? "No selling price set" : formatMoney(item.price)}
+                        {!noPrice && item.unit && <span className="font-normal text-slate-500"> / {item.unit}</span>}
                       </p>
                     </button>
                   );

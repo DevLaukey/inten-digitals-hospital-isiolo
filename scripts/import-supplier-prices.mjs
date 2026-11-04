@@ -4,7 +4,30 @@
 import { createClient } from "@supabase/supabase-js";
 
 // [name, buying price (printed), selling price (handwritten)]
+// Where two selling prices were written, the higher is used. Null means marked X: no price yet.
 const ITEMS = [
+  ["*SPAMOX* (Amoxicillin 60ml) ORAL SUSP 60ML", 36, 80],
+  ["CIPROCIN (CIPROFLOXACIN 0.3%) EYE DROPS 5ML", 87.5, 200],
+  ["FLAGIN (METRONIDAZOLE) SUSP 100ML", 43.75, 150],
+  ["KOFGON (GREEN) SYRUP 100ML", 29, 150],
+  ["KOFGON SYRUP 60ML (GREEN)", 23, 100],
+  ["FOLIC ACID 5MG TABS 100'S (ZAIN)", 40.07, 10],
+  ["MELOXICAM TABS 7.5MG 100'S", 117.59, 10],
+  ["FUROSEMIDE TABS 40MG 100'S", 69, 10],
+  ["LEVOFLOXACIN 500MG TABS 10'S", 50, 400],
+  ["OLSOLONE (PREDNISOLONE) SY 50ML", 87.5, 300],
+  ["PEARDINE MOUTHWASH 100ML", 85, 300],
+  ["SPOTCLAV (Co-Amoxiclav) ORAL SUSP *228.5* 100ML", 115, 350],
+  ["10CC SYRINGES 100'S", 440, null],
+  ["5CC SYRINGES 100'S", 255, null],
+  ["AMLODIPINE (AMLODY) 10MG TABS 30'S", 55.5, null],
+  ["CEFTRIAXONE 1G INJ (CEFZED)", 28.87, null],
+  ["ENTAMAXIN CAPS 30'S", 243.75, null],
+  ["GLUCOPHAGE 500MG TABS 90'S", 385, null],
+  ["LIGNOCAINE INJ 30ML", 27.14, null],
+  ["PARACETAMOL 1G IV 100ML", 51, null],
+  ['STRAPPING 2"', 49, null],
+  ["MYOSPAZ 100'S", 1650, null],
   ["ABZ SUSPENSION 10ML", 43.75, 100],
   ["ABZ Tablet", 34.3, 100], // already in the catalogue; its selling price is kept
   ["A.P.C TABLETS BLISTER 100'S", 100, 5],
@@ -90,17 +113,24 @@ if (readError) stop("Reading the catalogue", readError);
 const idByName = new Map(existing.map((item) => [key(item.name), item.id]));
 
 const missing = ITEMS.filter(([name]) => !idByName.has(key(name)));
-if (missing.length) {
+let unpriced = 0;
+for (const batch of [missing.filter(([, , price]) => price !== null), missing.filter(([, , price]) => price === null)]) {
+  if (!batch.length) continue;
   const { data, error } = await db
     .from("catalogue")
-    .insert(missing.map(([name, , price]) => ({ name, price, department: "Pharmacy" })))
+    .insert(batch.map(([name, , price]) => ({ name, price, department: "Pharmacy" })))
     .select("id, name");
+  if (error?.code === "23502") {
+    unpriced = batch.length;
+    continue;
+  }
   if (error) stop("Adding items", error);
   for (const item of data) idByName.set(key(item.name), item.id);
 }
-console.log(`Items: ${missing.length} added, ${ITEMS.length - missing.length} already there.`);
+console.log(`Items: ${missing.length - unpriced} added, ${ITEMS.length - missing.length} already there.`);
+if (unpriced) console.log(`${unpriced} items without a selling price NOT added: run docs/migrations/003_optional_selling_price.sql, then run this script again.`);
 
-const costs = ITEMS.map(([name, buying]) => ({ id: idByName.get(key(name)), buying_price: buying }));
+const costs = ITEMS.filter(([name]) => idByName.has(key(name))).map(([name, buying]) => ({ id: idByName.get(key(name)), buying_price: buying }));
 const whole = costs.filter((cost) => Number.isInteger(cost.buying_price));
 const withCents = costs.filter((cost) => !Number.isInteger(cost.buying_price));
 
